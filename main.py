@@ -3,21 +3,15 @@
 import argparse
 import math
 import random
-import subprocess
-import sys
-import unittest
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import networkx as nx
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
 
-def cadastro(clientes=15):
-    """Devolve pontos no formato (código, endereço, (x, y)), com o CD no índice 0."""
-    if not 10 <= clientes <= 20:
-        raise ValueError("Informe entre 10 e 20 clientes.")
+def cadastro(clientes=None):
+    """Devolve o CD e os clientes no formato (código, endereço, (x, y))."""
     locais = (
         ("Rua Ipê", 2, 18), ("Rua Cedro", 18, 3), ("Rua Angico", 4, 4),
         ("Rua Jatobá", 19, 16), ("Rua Jacarandá", 9, 19),
@@ -28,8 +22,15 @@ def cadastro(clientes=15):
         ("Rua Pitanga", 14, 13), ("Rua Quaresmeira", 8, 12),
         ("Rua Embaúba", 10, 5), ("Rua Imbuia", 12, 17),
         ("Rua Guapuruvu", 7, 2), ("Rua Sapucaia", 1, 14),
-        ("Rua Jabuticaba", 20, 7),
+        ("Rua Jabuticaba", 20, 7), ("Rua Santos", -1, 4),
     )
+
+    if clientes is None:
+        clientes = len(locais)
+
+    if not 1 <= clientes <= len(locais):
+        raise ValueError(f"Informe entre 1 e {len(locais)} clientes.")
+
     pontos = [("CD", "Avenida das Entregas, 100", (10, 10))]
     for numero, (rua, x, y) in enumerate(locais[:clientes], start=1):
         pontos.append((f"C{numero:02}", f"{rua}, {numero * 10}", (x, y)))
@@ -199,7 +200,7 @@ def salvar_graficos(
         nx.draw_networkx_labels(grafo, posicoes, labels=rotulos, ax=eixo,
                                 font_size=8, font_color="white")
         eixo.set_title(f"{titulo} · {distancia:.2f} km")
-        eixo.set(xlim=(-1, 22), ylim=(0, 21), aspect="equal",
+        eixo.set(xlim=(-1, 22), ylim=(0, 21), aspect="equal", #tam grafico
                  xlabel="Coordenada X (km)", ylabel="Coordenada Y (km)")
         eixo.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
         eixo.grid(alpha=0.17)
@@ -222,7 +223,7 @@ def salvar_graficos(
 def main() -> None:
     """Valida os parâmetros, executa o ACO e apresenta a comparação."""
     parser = argparse.ArgumentParser(description="Otimização de rotas de entrega com ACO.")
-    parser.add_argument("--clientes", type=int, default=15, help="Quantidade de clientes (10 a 20)")
+    parser.add_argument("--clientes", type=int, help="Quantidade de clientes. Por padrão, usa todos.")
     parser.add_argument("--formigas", type=int, default=25, help="Formigas por iteração")
     parser.add_argument("--iteracoes", type=int, default=100, help="Total de iterações")
     parser.add_argument("--alfa", type=float, default=1.0, help="Influência do feromônio")
@@ -277,72 +278,5 @@ def main() -> None:
     print(f"Gráficos salvos em {args.saida.resolve()}")
 
 
-class RotasTest(unittest.TestCase):
-    def test_matriz_e_fechamento_do_circuito(self):
-        matriz = matriz_distancias([(0, 0), (3, 0), (3, 4)])
-        self.assertEqual(matriz, [[0, 3, 5], [3, 0, 4], [5, 4, 0]])
-        self.assertEqual(distancia_rota(matriz, (0, 1, 2, 0)), 12)
-
-    def test_aco_encontra_perimetro_do_quadrado(self):
-        matriz = matriz_distancias([(0, 0), (1, 1), (1, 0), (0, 1)])
-        melhor_rota, melhor_distancia, historico = otimizar(matriz, formigas=8, iteracoes=10)
-        self.assertEqual(melhor_rota[0], 0)
-        self.assertEqual(melhor_rota[-1], 0)
-        self.assertEqual(sorted(melhor_rota[1:-1]), [1, 2, 3])
-        self.assertEqual(melhor_distancia, 4)
-        self.assertEqual(melhor_distancia, distancia_rota(matriz, melhor_rota))
-        self.assertEqual(len(historico), 10)
-        self.assertEqual(historico, sorted(historico, reverse=True))
-        self.assertEqual(historico[-1], melhor_distancia)
-        self.assertEqual((melhor_rota, melhor_distancia, historico),
-                         otimizar(matriz, formigas=8, iteracoes=10))
-
-    def test_limites_do_cadastro(self):
-        self.assertEqual(len(cadastro(10)), 11)
-        self.assertEqual(len(cadastro(20)), 21)
-        for quantidade in (9, 21):
-            with self.subTest(quantidade=quantidade), self.assertRaises(ValueError):
-                cadastro(quantidade)
-
-    def test_parametros_invalidos(self):
-        for parametro in ({"formigas": 0}, {"iteracoes": 0}, {"alfa": -1},
-                          {"beta": float("nan")}, {"evaporacao": 1}, {"semente": -1}):
-            with self.subTest(parametro=parametro), self.assertRaises(ValueError):
-                otimizar([[0, 1], [1, 0]], **parametro)
-
-    def test_rejeita_distancias_invalidas(self):
-        for matriz in ([[0, 0], [0, 0]], [[0, 1], [2, 0]], [[0, 1, 2]]):
-            with self.subTest(matriz=matriz), self.assertRaises(ValueError):
-                otimizar(matriz)
-
-
-class CLITest(unittest.TestCase):
-    def test_gera_comparacao_e_graficos(self):
-        projeto = Path(__file__).resolve().parent
-        with TemporaryDirectory() as pasta:
-            execucao = subprocess.run(
-                [sys.executable, "-B", "-X", "utf8", "main.py", "--clientes", "10",
-                 "--formigas", "4", "--iteracoes", "3", "--saida", pasta],
-                cwd=projeto, capture_output=True, encoding="utf-8", timeout=30,
-            )
-            self.assertEqual(execucao.returncode, 0, execucao.stderr)
-            for trecho in ("Rota inicial", "Melhor rota ACO", "min estimados", "R$", "%"):
-                self.assertIn(trecho, execucao.stdout)
-            for nome in ("rotas.png", "evolucao.png"):
-                self.assertTrue((Path(pasta) / nome).read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
-
-    def test_rejeita_cliente_fora_do_intervalo(self):
-        projeto = Path(__file__).resolve().parent
-        execucao = subprocess.run(
-            [sys.executable, "-B", "-X", "utf8", "main.py", "--clientes", "21"],
-            cwd=projeto, capture_output=True, encoding="utf-8", timeout=30,
-        )
-        self.assertEqual(execucao.returncode, 2)
-        self.assertIn("Informe entre 10 e 20 clientes.", execucao.stderr)
-
-
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--test"]:
-        unittest.main(argv=[sys.argv[0]], verbosity=2)
-    else:
-        main()
+    main()

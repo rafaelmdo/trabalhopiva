@@ -15,7 +15,6 @@ No PowerShell, instale as dependências e execute a demonstração.
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe main.py
-.\.venv\Scripts\python.exe main.py --test
 ```
 
 No Linux e macOS, use `./.venv/bin/python` nos mesmos comandos. Com as dependências já instaladas, basta executar `python main.py`.
@@ -67,6 +66,6 @@ A distância economizada foi **137,64 km (62,56%)**, calculada antes do arredond
 
 O algoritmo usa apenas a biblioteca padrão do Python para calcular distâncias e fazer sorteios. NetworkX representa as rotas como grafos e Matplotlib gera os PNGs. Matplotlib instala NumPy como dependência indireta.
 
-O arquivo `main.py` reúne o cadastro, o algoritmo, os gráficos, a interface de terminal e os testes automatizados. Execute `python main.py --test` para rodar os testes.
+O arquivo `main.py` reúne o cadastro, o algoritmo, os gráficos, e a interface de terminal.
 
 A função de otimização recebe uma matriz independente do cadastro e dos gráficos. Uma integração com mapas pode fornecer sua própria matriz simétrica. Para usar tempos ou distâncias viárias assimétricas, será preciso estender a validação e o depósito de feromônio para trechos direcionados. Um futuro solucionador VRP pode reutilizar o cadastro e as operações de distância, com um resultado de múltiplas rotas e regras de capacidade, prioridade e janelas de entrega.
